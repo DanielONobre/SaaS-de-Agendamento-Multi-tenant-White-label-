@@ -1,98 +1,104 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "@/components/ui/use-toast";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from '@/components/ui/use-toast';
+import { z } from 'zod';
 
-const API_BASE_URL = "http://localhost:3000"; // Assuming API runs on port 3000
+// Define API base URL (adjust if needed)
+const API_BASE_URL = '/api'; // Assuming Next.js API routes or proxy
 
-// Hook to fetch services for a given tenant
-export function useServices(tenantId: string) {
-  return useQuery({
-    queryKey: ["services", tenantId],
-    queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/services?tenantId=${tenantId}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch services");
-      }
-      return response.json();
-    },
-    enabled: !!tenantId, // Only run the query if tenantId is available
+// Generic fetcher function
+const fetcher = async <T>(url: string): Promise<T> => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || 'An error occurred');
+  }
+  return response.json();
+};
+
+// Schemas for data types
+const serviceSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  description: z.string().optional(),
+  price: z.number(),
+  duration: z.number(), // in minutes
+  tenantId: z.string().uuid(),
+});
+
+const professionalSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  tenantId: z.string().uuid(),
+});
+
+const createAppointmentSchema = z.object({
+  professionalId: z.string().uuid(),
+  serviceId: z.string().uuid(),
+  startTime: z.string().datetime(), // ISO string
+  customerName: z.string().min(3, 'Customer name must be at least 3 characters'),
+});
+
+export type Service = z.infer<typeof serviceSchema>;
+export type Professional = z.infer<typeof professionalSchema>;
+export type CreateAppointmentPayload = z.infer<typeof createAppointmentSchema>;
+
+// Hook to fetch services
+export const useServices = (tenantId: string) => {
+  return useQuery<Service[], Error>({
+    queryKey: ['services', tenantId],
+    queryFn: () => fetcher<Service[]>(`${API_BASE_URL}/services?tenantId=${tenantId}`),
+    enabled: !!tenantId, // Only run if tenantId is available
   });
-}
+};
 
-// Hook to fetch professionals for a given tenant
-export function useProfessionals(tenantId: string) {
-  return useQuery({
-    queryKey: ["professionals", tenantId],
-    queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/professionals?tenantId=${tenantId}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch professionals");
-      }
-      return response.json();
-    },
-    enabled: !!tenantId, // Only run the query if tenantId is available
+// Hook to fetch professionals
+export const useProfessionals = (tenantId: string) => {
+  return useQuery<Professional[], Error>({
+    queryKey: ['professionals', tenantId],
+    queryFn: () => fetcher<Professional[]>(`${API_BASE_URL}/professionals?tenantId=${tenantId}`),
+    enabled: !!tenantId, // Only run if tenantId is available
   });
-}
-
-interface CreateAppointmentPayload {
-  professionalId: string;
-  serviceId: string;
-  startTime: string; // ISO string
-  customerName: string;
-  tenantId: string;
-  customerId: string; // Assuming a customerId is needed, will generate a random one for now
-}
+};
 
 // Hook to create an appointment
-export function useCreateAppointment() {
+export const useCreateAppointment = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (newAppointment: CreateAppointmentPayload) => {
+  return useMutation<any, Error, CreateAppointmentPayload>({
+    mutationFn: async (newAppointment) => {
       const response = await fetch(`${API_BASE_URL}/appointments`, {
-        method: "POST",
+        method: 'POST',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify(newAppointment),
       });
 
       if (!response.ok) {
-        // Attempt to parse error message from response body
-        let errorMessage = "Failed to create appointment";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          // If response is not JSON, use status text
-          errorMessage = response.statusText || errorMessage;
+        const errorData = await response.json();
+        if (response.status === 409) {
+          throw new Error('Horário Indisponível');
         }
-        throw new Error(`${response.status} ${errorMessage}`);
+        throw new Error(errorData.message || 'Erro ao agendar');
       }
-
       return response.json();
     },
     onSuccess: () => {
       toast({
-        title: "Agendamento criado!",
-        description: "Seu agendamento foi realizado com sucesso.",
-        variant: "success",
+        title: 'Agendamento realizado!',
+        description: 'Seu agendamento foi criado com sucesso.',
       });
-      queryClient.invalidateQueries({ queryKey: ["appointments"] }); // Invalidate appointments query to refetch
+      // Invalidate relevant queries to refetch data
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
     },
-    onError: (error: any) => {
-      if (error.message.includes("409")) { // Check for 409 status code in the error message
-        toast({
-          title: "Horário Indisponível",
-          description: "Esse horário já está ocupado. Tente outro.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Erro ao agendar",
-          description: error.message || "Ocorreu um erro ao tentar agendar.",
-          variant: "destructive",
-        });
-      }
+    onError: (error) => {
+      toast({
+        title: 'Erro no agendamento',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
-}
+};

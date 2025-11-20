@@ -1,10 +1,8 @@
 "use client";
 
+import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { v4 as uuidv4 } from 'uuid'; // For generating a temporary customerId
-
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -22,21 +20,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useProfessionals, useServices, useCreateAppointment } from "@/hooks/use-booking";
+import { useServices, useProfessionals, useCreateAppointment } from "@/hooks/use-booking";
+import { v4 as uuidv4 } from 'uuid'; // For placeholder TENANT_ID
 
-// Placeholder TENANT_ID - REPLACE WITH A VALID TENANT ID FROM YOUR DATABASE
+// Placeholder TENANT_ID - REPLACE WITH ACTUAL TENANT ID FROM DB FOR TESTING
 const TENANT_ID = "a1b2c3d4-e5f6-7890-1234-567890abcdef"; // Example UUID
 
-const formSchema = z.object({
-  professionalId: z.string().uuid({ message: "Selecione um profissional válido." }),
-  serviceId: z.string().uuid({ message: "Selecione um serviço válido." }),
-  startTime: z.string().min(1, { message: "A data e hora são obrigatórias." }),
-  customerName: z.string().min(3, { message: "O nome do cliente deve ter pelo menos 3 caracteres." }),
+const bookingFormSchema = z.object({
+  professionalId: z.string().uuid({ message: "Please select a professional." }),
+  serviceId: z.string().uuid({ message: "Please select a service." }),
+  startTime: z.string().datetime({ message: "Please select a valid date and time." }),
+  customerName: z.string().min(3, { message: "Customer name must be at least 3 characters." }),
 });
 
 export function BookingForm() {
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
+  const form = useForm<z.infer<typeof bookingFormSchema>>({
+    resolver: zodResolver(bookingFormSchema),
     defaultValues: {
       professionalId: "",
       serviceId: "",
@@ -49,113 +48,103 @@ export function BookingForm() {
   const { data: professionals, isLoading: isLoadingProfessionals } = useProfessionals(TENANT_ID);
   const { mutate: createAppointment, isPending } = useCreateAppointment();
 
-  async function onSubmit(values: z.infer<typeof formSchema>) {
-    // Generate a temporary customerId for now
-    const customerId = uuidv4();
-
-    createAppointment({
-      ...values,
-      tenantId: TENANT_ID,
-      customerId: customerId,
-    });
+  function onSubmit(values: z.infer<typeof bookingFormSchema>) {
+    createAppointment(values);
   }
 
   return (
-    <div className="max-w-md mx-auto p-4 border rounded-lg shadow-lg">
-      <h2 className="text-2xl font-bold mb-6 text-center">Agendar Horário</h2>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-          <FormField
-            control={form.control}
-            name="professionalId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Profissional</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um profissional" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {isLoadingProfessionals ? (
-                      <SelectItem value="loading" disabled>Carregando profissionais...</SelectItem>
-                    ) : (
-                      professionals?.map((professional: any) => (
-                        <SelectItem key={professional.id} value={professional.id}>
-                          {professional.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <FormField
+          control={form.control}
+          name="customerName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Customer Name</FormLabel>
+              <FormControl>
+                <Input placeholder="John Doe" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <FormField
-            control={form.control}
-            name="serviceId"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Serviço</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um serviço" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {isLoadingServices ? (
-                      <SelectItem value="loading" disabled>Carregando serviços...</SelectItem>
-                    ) : (
-                      services?.map((service: any) => (
-                        <SelectItem key={service.id} value={service.id}>
-                          {service.name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="startTime"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Data e Hora</FormLabel>
+        <FormField
+          control={form.control}
+          name="professionalId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Professional</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
-                  <Input type="datetime-local" {...field} />
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a professional" />
+                  </SelectTrigger>
                 </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                <SelectContent>
+                  {isLoadingProfessionals ? (
+                    <SelectItem value="loading" disabled>Loading professionals...</SelectItem>
+                  ) : (
+                    professionals?.map((professional) => (
+                      <SelectItem key={professional.id} value={professional.id}>
+                        {professional.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <FormField
-            control={form.control}
-            name="customerName"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Nome do Cliente</FormLabel>
+        <FormField
+          control={form.control}
+          name="serviceId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Service</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
                 <FormControl>
-                  <Input placeholder="Seu nome" {...field} />
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a service" />
+                  </SelectTrigger>
                 </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                <SelectContent>
+                  {isLoadingServices ? (
+                    <SelectItem value="loading" disabled>Loading services...</SelectItem>
+                  ) : (
+                    services?.map((service) => (
+                      <SelectItem key={service.id} value={service.id}>
+                        {service.name} - ${service.price.toFixed(2)}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
-          <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? "Agendando..." : "Agendar"}
-          </Button>
-        </form>
-      </Form>
-    </div>
+        <FormField
+          control={form.control}
+          name="startTime"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Start Time</FormLabel>
+              <FormControl>
+                <Input type="datetime-local" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <Button type="submit" disabled={isPending}>
+          {isPending ? "Scheduling..." : "Schedule Appointment"}
+        </Button>
+      </form>
+    </Form>
   );
 }
