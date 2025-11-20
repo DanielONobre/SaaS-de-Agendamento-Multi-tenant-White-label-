@@ -1,6 +1,7 @@
 'use client';
 
-import React from 'react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import {
   Table,
   TableBody,
@@ -9,10 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useAppointments, Appointment, useCancelAppointment } from '@/hooks/use-admin';
 import { Button } from '@/components/ui/button';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import { useAppointments, useCancelAppointment, Appointment } from '@/hooks/use-admin';
 
 interface AppointmentsTableProps {
   tenantId: string;
@@ -20,67 +19,57 @@ interface AppointmentsTableProps {
 
 export function AppointmentsTable({ tenantId }: AppointmentsTableProps) {
   const { data: appointments, isLoading, isError } = useAppointments(tenantId);
-  const { mutate: cancelAppointment, isPending: isCancelling } = useCancelAppointment();
+  const cancelAppointmentMutation = useCancelAppointment();
 
   if (isLoading) {
-    return <div>Loading appointments...</div>;
+    return <div>Carregando agendamentos...</div>;
   }
 
   if (isError) {
-    return <div>Error loading appointments.</div>;
+    return <div>Erro ao carregar agendamentos.</div>;
   }
 
   const handleCancel = (appointmentId: string) => {
-    if (confirm('Are you sure you want to cancel this appointment?')) {
-      cancelAppointment(appointmentId);
-    }
+    cancelAppointmentMutation.mutate(appointmentId);
   };
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Data/Hora</TableHead>
-            <TableHead>Cliente</TableHead>
-            <TableHead>Serviço</TableHead>
-            <TableHead>Profissional</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead className="text-right">Ações</TableHead>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Data/Hora</TableHead>
+          <TableHead>Cliente</TableHead>
+          <TableHead>Serviço</TableHead>
+          <TableHead>Profissional</TableHead>
+          <TableHead>Status</TableHead>
+          <TableHead className="text-right">Ações</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {appointments?.map((appointment: Appointment) => (
+          <TableRow key={appointment.id}>
+            <TableCell>
+              {format(new Date(appointment.startTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+            </TableCell>
+            <TableCell>{appointment.customer?.name || 'N/A'}</TableCell>
+            <TableCell>{appointment.service?.name || 'N/A'}</TableCell>
+            <TableCell>{appointment.professional?.name || 'N/A'}</TableCell>
+            <TableCell>{appointment.status}</TableCell>
+            <TableCell className="text-right">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => handleCancel(appointment.id)}
+                disabled={
+                  appointment.status === 'CANCELED' || cancelAppointmentMutation.isPending
+                }
+              >
+                Cancelar
+              </Button>
+            </TableCell>
           </TableRow>
-        </TableHeader>
-        <TableBody>
-          {appointments?.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={6} className="h-24 text-center">
-                No appointments found.
-              </TableCell>
-            </TableRow>
-          ) : (
-            appointments?.map((appointment) => (
-              <TableRow key={appointment.id}>
-                <TableCell>
-                  {format(new Date(appointment.startTime), 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-                </TableCell>
-                <TableCell>{appointment.customer?.name || appointment.customerId}</TableCell>
-                <TableCell>{appointment.service?.name || appointment.serviceId}</TableCell>
-                <TableCell>{appointment.professional?.name || appointment.professionalId}</TableCell>
-                <TableCell>{appointment.status}</TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => handleCancel(appointment.id)}
-                    disabled={appointment.status === 'CANCELED' || isCancelling}
-                  >
-                    Cancelar
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
-    </div>
+        ))}
+      </TableBody>
+    </Table>
   );
 }

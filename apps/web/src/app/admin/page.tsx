@@ -1,14 +1,19 @@
 'use client';
 
-import React, { useState } from 'react';
-import { format, addDays, subDays, startOfDay, endOfDay } from 'date-fns';
+import { useState } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { addDays, subDays, format, startOfDay, endOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Button } from '@/components/ui/button'; // Assuming Button is available
-import { DayView } from '@/components/day-view'; // Import the DayView component
-import { useAppointments } from '@/hooks/use-admin'; // Import useAppointments
 
-const AdminPage = () => {
-  const TENANT_ID = 'c1a2b3c4-d5e6-7890-1234-567890abcdef'; // Hardcoded TENANT_ID for now
+import { DayView } from '@/components/day-view';
+import { useAppointments } from '@/hooks/use-admin';
+import { Button } from '@/components/ui/button';
+
+const queryClient = new QueryClient();
+
+const TENANT_ID = 'clsy0427j0000131000000000'; // Hardcoded for now
+
+export default function AdminPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
 
   const formattedStartDate = format(startOfDay(currentDate), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
@@ -17,34 +22,38 @@ const AdminPage = () => {
   const { data: appointments, isLoading, isError } = useAppointments(
     TENANT_ID,
     formattedStartDate,
-    formattedEndDate
+    formattedEndDate,
   );
 
   const handlePreviousDay = () => {
-    setCurrentDate((prevDate) => subDays(prevDate, 1));
+    setCurrentDate((prev) => subDays(prev, 1));
   };
 
   const handleNextDay = () => {
-    setCurrentDate((prevDate) => addDays(prevDate, 1));
+    setCurrentDate((prev) => addDays(prev, 1));
   };
 
   return (
-    <div className="container mx-auto py-10">
-      <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
+    <QueryClientProvider client={queryClient}>
+      <div className="container mx-auto py-10">
+        <h1 className="text-3xl font-bold mb-6">Admin Dashboard</h1>
 
-      <div className="flex items-center justify-between mb-4">
-        <Button onClick={handlePreviousDay}>Dia Anterior</Button>
-        <h2 className="text-xl font-semibold">
-          {format(currentDate, 'PPP', { locale: ptBR })}
-        </h2>
-        <Button onClick={handleNextDay}>Próximo Dia</Button>
+        <div className="flex items-center justify-between mb-6">
+          <Button onClick={handlePreviousDay} variant="outline">
+            Dia Anterior
+          </Button>
+          <h2 className="text-xl font-semibold">
+            {format(currentDate, 'PPP', { locale: ptBR })}
+          </h2>
+          <Button onClick={handleNextDay} variant="outline">
+            Próximo Dia
+          </Button>
+        </div>
+
+        {isLoading && <div>Carregando agendamentos...</div>}
+        {isError && <div>Erro ao carregar agendamentos.</div>}
+        {appointments && <DayView appointments={appointments} />}
       </div>
-
-      {isLoading && <div>Loading appointments for {format(currentDate, 'PPP')}...</div>}
-      {isError && <div>Error loading appointments.</div>}
-      {appointments && <DayView appointments={appointments} currentDate={currentDate} />}
-    </div>
+    </QueryClientProvider>
   );
-};
-
-export default AdminPage;
+}

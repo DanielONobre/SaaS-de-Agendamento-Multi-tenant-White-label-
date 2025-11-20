@@ -1,100 +1,114 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "@/components/ui/use-toast";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from '@/components/ui/use-toast';
+import { z } from 'zod';
 
-const API_BASE_URL = "http://localhost:3000";
+const API_BASE_URL = '/api';
 
-// Define AppointmentStatus enum (assuming it matches backend)
-export type AppointmentStatus = 'CONFIRMED' | 'CANCELED' | 'PENDING'; // Add other statuses if needed
+const fetcher = async <T>(url: string): Promise<T> => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || 'An error occurred');
+  }
+  return response.json();
+};
 
-// Define Appointment type (adjust based on actual API response)
-export interface Appointment {
-  id: string;
-  startTime: string;
-  endTime: string;
-  status: AppointmentStatus;
-  tenantId: string;
-  professionalId: string;
-  serviceId: string;
-  customerId: string;
-  // Include nested objects if they are returned by the API
-  professional?: {
-    id: string;
-    name: string;
-  };
-  service?: {
-    id: string;
-    name: string;
-  };
-  customer?: {
-    id: string;
-    name: string;
-  };
-}
+const mutationFetcher = async <T>(url: string, method: string, data?: any): Promise<T> => {
+  const response = await fetch(url, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: data ? JSON.stringify(data) : undefined,
+  });
 
-// Hook to fetch appointments for a given tenant
-export function useAppointments(
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(errorData.message || 'An error occurred');
+  }
+  return response.json();
+};
+
+const professionalSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  tenantId: z.string().uuid(),
+});
+
+const serviceSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  description: z.string().optional(),
+  price: z.number(),
+  durationMin: z.number(), // in minutes
+  tenantId: z.string().uuid(),
+});
+
+// Assuming a simple customer structure for now, based on common use cases
+const customerSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  email: z.string().email().optional(),
+  phone: z.string().optional(),
+});
+
+const appointmentSchema = z.object({
+  id: z.string().uuid(),
+  tenantId: z.string().uuid(),
+  startTime: z.string().datetime(),
+  endTime: z.string().datetime(),
+  status: z.enum(['CONFIRMED', 'CANCELED', 'COMPLETED']), // Assuming these statuses
+  professionalId: z.string().uuid(),
+  professional: professionalSchema, // Included from backend
+  service: serviceSchema, // Included from backend
+  customer: customerSchema, // Included from backend
+});
+
+export type Appointment = z.infer<typeof appointmentSchema>;
+
+export const useAppointments = (
   tenantId: string,
   startDate?: string,
   endDate?: string,
-) {
-  return useQuery<Appointment[]>({
-    queryKey: ["appointments", tenantId, startDate, endDate],
-    queryFn: async () => {
+) => {
+  return useQuery<Appointment[], Error>({
+    queryKey: ['appointments', tenantId, startDate, endDate],
+    queryFn: () => {
       const params = new URLSearchParams();
-      params.append("tenantId", tenantId);
-      if (startDate) params.append("startDate", startDate);
-      if (endDate) params.append("endDate", endDate);
-
-      const response = await fetch(`${API_BASE_URL}/appointments?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error("Failed to fetch appointments");
+      params.append('tenantId', tenantId);
+      if (startDate) {
+        params.append('startDate', startDate);
       }
-      return response.json();
+      if (endDate) {
+        params.append('endDate', endDate);
+      }
+      return fetcher<Appointment[]>(`${API_BASE_URL}/appointments?${params.toString()}`);
     },
-    enabled: !!tenantId, // Only run the query if tenantId is available
+    enabled: !!tenantId,
   });
-}
+};
 
-// Hook to cancel an appointment
-export function useCancelAppointment() {
+export const useCancelAppointment = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: async (appointmentId: string) => {
-      const response = await fetch(`${API_BASE_URL}/appointments/${appointmentId}/cancel`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        let errorMessage = "Failed to cancel appointment";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          errorMessage = response.statusText || errorMessage;
-        }
-        throw new Error(`${response.status} ${errorMessage}`);
-      }
-
-      return response.json();
-    },
+  return useMutation<Appointment, Error, string>({
+    mutationFn: (id: string) =>
+      mutationFetcher<Appointment>(`${API_BASE_URL}/appointments/${id}/cancel`, 'PATCH'),
     onSuccess: () => {
       toast({
-        title: "Agendamento cancelado!",
-        description: "O agendamento foi cancelado com sucesso.",
-        variant: "success",
+        title: 'Agendamento cancelado!',
+        description: 'O agendamento foi cancelado com sucesso.',
       });
-      queryClient.invalidateQueries({ queryKey: ["appointments"] }); // Invalidate appointments query to refetch
+      queryClient.invalidateQueries({ queryKey: ['appointments'] });
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
-        title: "Erro ao cancelar agendamento",
-        description: error.message || "Ocorreu um erro ao tentar cancelar o agendamento.",
-        variant: "destructive",
+        title: 'Erro ao cancelar agendamento',
+        description: error.message,
+        variant: 'destructive',
       });
     },
   });
-}
+};

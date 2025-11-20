@@ -80,11 +80,14 @@ export class AppointmentsService {
   ) {
     const where: any = { tenantId };
 
-    if (startDate) {
-      where.startTime = { gte: new Date(startDate) };
-    }
-    if (endDate) {
-      where.startTime = { ...where.startTime, lte: new Date(endDate) };
+    if (startDate || endDate) {
+      where.startTime = {};
+      if (startDate) {
+        where.startTime.gte = new Date(startDate);
+      }
+      if (endDate) {
+        where.startTime.lte = new Date(endDate);
+      }
     }
 
     return this.prisma.appointment.findMany({
