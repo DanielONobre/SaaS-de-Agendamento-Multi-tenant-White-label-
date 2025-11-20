@@ -21,8 +21,12 @@ export class AppointmentsController {
   }
 
   @Get()
-  findAllByTenant(@Query('tenantId', ParseUUIDPipe) tenantId: string) {
-    return this.appointmentsService.findAllByTenant(tenantId);
+  findAllByTenant(
+    @Query('tenantId', ParseUUIDPipe) tenantId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.appointmentsService.findAllByTenant(tenantId, startDate, endDate);
   }
 
   @Patch(':id/cancel')

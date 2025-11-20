@@ -32,11 +32,20 @@ export interface Appointment {
 }
 
 // Hook to fetch appointments for a given tenant
-export function useAppointments(tenantId: string) {
+export function useAppointments(
+  tenantId: string,
+  startDate?: string,
+  endDate?: string,
+) {
   return useQuery<Appointment[]>({
-    queryKey: ["appointments", tenantId],
+    queryKey: ["appointments", tenantId, startDate, endDate],
     queryFn: async () => {
-      const response = await fetch(`${API_BASE_URL}/appointments?tenantId=${tenantId}`);
+      const params = new URLSearchParams();
+      params.append("tenantId", tenantId);
+      if (startDate) params.append("startDate", startDate);
+      if (endDate) params.append("endDate", endDate);
+
+      const response = await fetch(`${API_BASE_URL}/appointments?${params.toString()}`);
       if (!response.ok) {
         throw new Error("Failed to fetch appointments");
       }

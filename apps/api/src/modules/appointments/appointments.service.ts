@@ -73,16 +73,29 @@ export class AppointmentsService {
     });
   }
 
-  async findAllByTenant(tenantId: string) {
+  async findAllByTenant(
+    tenantId: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    const where: any = { tenantId };
+
+    if (startDate) {
+      where.startTime = { gte: new Date(startDate) };
+    }
+    if (endDate) {
+      where.startTime = { ...where.startTime, lte: new Date(endDate) };
+    }
+
     return this.prisma.appointment.findMany({
-      where: { tenantId },
+      where,
       include: {
         professional: true,
         service: true,
         customer: true,
       },
       orderBy: {
-        startTime: 'desc',
+        startTime: 'asc', // Changed to asc for calendar view
       },
     });
   }
