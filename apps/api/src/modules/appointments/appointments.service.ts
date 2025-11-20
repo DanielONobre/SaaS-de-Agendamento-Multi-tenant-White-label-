@@ -86,4 +86,19 @@ export class AppointmentsService {
       },
     });
   }
+
+  async cancel(id: string) {
+    const appointment = await this.prisma.appointment.findUnique({
+      where: { id },
+    });
+
+    if (!appointment) {
+      throw new NotFoundException(`Appointment with ID ${id} not found.`);
+    }
+
+    return this.prisma.appointment.update({
+      where: { id },
+      data: { status: 'CANCELED' },
+    });
+  }
 }

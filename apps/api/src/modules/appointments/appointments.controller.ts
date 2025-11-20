@@ -4,6 +4,8 @@ import {
   Post,
   Body,
   Query,
+  Param,
+  Patch,
   ParseUUIDPipe,
 } from '@nestjs/common';
 import { AppointmentsService } from './appointments.service';
@@ -21,5 +23,10 @@ export class AppointmentsController {
   @Get()
   findAllByTenant(@Query('tenantId', ParseUUIDPipe) tenantId: string) {
     return this.appointmentsService.findAllByTenant(tenantId);
+  }
+
+  @Patch(':id/cancel')
+  cancel(@Param('id', ParseUUIDPipe) id: string) {
+    return this.appointmentsService.cancel(id);
   }
 }
