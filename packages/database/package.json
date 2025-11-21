@@ -8,17 +8,18 @@
   ],
   "scripts": {
     "build": "tsup index.ts --format cjs,esm --dts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "generate": "prisma generate"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@prisma/client": "latest"
-  },
-  "devDependencies": {
-    "prisma": "latest",
+  "@prisma/client": "^5.22.0"
+},
+"devDependencies": {
+  "prisma": "^5.22.0",
     "tsup": "latest",
     "typescript": "latest"
   }
